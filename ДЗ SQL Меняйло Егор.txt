@@ -1,0 +1,109 @@
+1)Написать запрос, выводящий Имя и фамилию самых бедных клиентов - среди замужных женщин, не проживающих ни в Японии, ни в Бразилии, ни в Италии. Богатство определяется по кредитному лимиту. [Отсортировать по CUST_LAST_NAME].
+Решение:
+select cust_first_name,cust_last_name from sh.customers
+where cust_gender='F' AND cust_marital_status='married' AND country_id not in (select distinct country_id from sh.countries
+where country_name='Japan' or country_name='Brazil' or country_name='Italy')  and cust_credit_limit = (SELECT MIN(cust_credit_limit ) FROM sh.customers)
+order by cust_last_name
+2)Написать запрос, выводящий Клиента с самым длинным домашним адресом, чей телефонный номер заканчивается на 77. Вывести результат в одном столбце, в формате “Name: [cust_first_name] [cust_last_name]; city: [cust_city]; address: [cust_street_address]; number:[cust_main_phone_number]; email: [cust_email]; ”. (всё, что обернуто в [] – названия полей (столбцов) таблицы).
+select concat('Name: ',concat(concat(cust_first_name,' '),cust_last_name))as Result from(select cust_first_name,cust_last_name,cust_city,cust_street_address,cust_main_phone_number,cust_email,h,l from(select cust_first_name,cust_last_name,cust_city,cust_street_address,cust_main_phone_number,cust_email,SUBSTR(cust_main_phone_number, 11, 2)as h,length(cust_street_address)as l from sh.customers)
+where h='77' AND l=(select max (l) from(select cust_first_name,h,l from(select cust_first_name,SUBSTR(cust_main_phone_number, 11, 2)as h,length(cust_street_address)as l from sh.customers)
+where h='77')))
+UNION All
+select concat('city: ',cust_city) from(select cust_first_name,cust_last_name,cust_city,cust_street_address,cust_main_phone_number,cust_email,h,l from(select cust_first_name,cust_last_name,cust_city,cust_street_address,cust_main_phone_number,cust_email,SUBSTR(cust_main_phone_number, 11, 2)as h,length(cust_street_address)as l from sh.customers)
+where h='77' AND l=(select max (l) from(select cust_first_name,h,l from(select cust_first_name,SUBSTR(cust_main_phone_number, 11, 2)as h,length(cust_street_address)as l from sh.customers)
+where h='77')))
+UNION ALL
+select concat('address: ',cust_street_address) from(select cust_first_name,cust_last_name,cust_city,cust_street_address,cust_main_phone_number,cust_email,h,l from(select cust_first_name,cust_last_name,cust_city,cust_street_address,cust_main_phone_number,cust_email,SUBSTR(cust_main_phone_number, 11, 2)as h,length(cust_street_address)as l from sh.customers)
+where h='77' AND l=(select max (l) from(select cust_first_name,h,l from(select cust_first_name,SUBSTR(cust_main_phone_number, 11, 2)as h,length(cust_street_address)as l from sh.customers)
+where h='77')))
+UNION ALL
+select concat('number: ',cust_main_phone_number) from(select cust_first_name,cust_last_name,cust_city,cust_street_address,cust_main_phone_number,cust_email,h,l from(select cust_first_name,cust_last_name,cust_city,cust_street_address,cust_main_phone_number,cust_email,SUBSTR(cust_main_phone_number, 11, 2)as h,length(cust_street_address)as l from sh.customers)
+where h='77' AND l=(select max (l) from(select cust_first_name,h,l from(select cust_first_name,SUBSTR(cust_main_phone_number, 11, 2)as h,length(cust_street_address)as l from sh.customers)
+where h='77')))
+UNION ALL
+select concat('email: ',cust_email)from(select cust_first_name,cust_last_name,cust_city,cust_street_address,cust_main_phone_number,cust_email,h,l from(select cust_first_name,cust_last_name,cust_city,cust_street_address,cust_main_phone_number,cust_email,SUBSTR(cust_main_phone_number, 11, 2)as h,length(cust_street_address)as l from sh.customers)
+where h='77' AND l=(select max (l) from(select cust_first_name,h,l from(select cust_first_name,SUBSTR(cust_main_phone_number, 11, 2)as h,length(cust_street_address)as l from sh.customers)
+where h='77')))
+4)Написать запрос, выводящий Всех клиентов-мужчин с уровнем дохода "D", у которых не заполнено поле "семейное положение" и которые проживают в США или Германии (с использованием EXISTS). Отсортировать по cust_id.
+select cust_id,cust_first_name,cust_last_name,inc,cust_gender,cust_marital_status,country_id from(select cust_id,cust_first_name,cust_last_name,SUBSTR(cust_income_level, 1, 1) as inc,cust_gender,cust_marital_status,country_id from sh.customers) tabul
+where inc='D' and cust_gender='M' and cust_marital_status is NULL and exists (select cust_id,cust_first_name,cust_last_name,inc,cust_gender,cust_marital_status from(select cust_id,cust_first_name,cust_last_name,SUBSTR(cust_income_level, 1, 1) as inc,cust_gender,cust_marital_status,country_id from sh.customers)
+where (country_id='US' or country_id='DE') AND cust_id=tabul.cust_id)
+order by cust_id
+8)Написать запрос, выводящий Процентное соотношение мужчин и женщин, проживающих в каждой стране, отсортированное по названию страны в алфавитном порядке. Столбцы в выводе должны быть такими: «Страна», «% мужчин», «% женщин» [использовать WITH]. Упорядочить по полному названию стран.
+with ad as
+(select country_name,sum(case when cust_gender = 'M' then 1 else 0 end) * 100 / count(*) as male
+from sh.customers cust join sh.countries coun on cust.country_id=coun.country_id
+group by country_name
+order by country_name)
+select country_name as "Страна", male as "% мужчин",100-male as "% женщин" from ad
+3)Написать запрос, выводящий Всех клиентов, которые купили самый дешевый продукт в категории ПО (Software/Other) или Фототехника (Photo) (связка таблиц CUSTOMERS -> SALES -> PRODUCTS), среди тех, кто родился позже 1980 года [самостоятельно выбрать категории, которые есть в таблице];
+with ad as
+(select prod_category,min(prod_list_price) min_price from (select * from products prod inner join sales sal on prod.prod_id=sal.prod_id inner join customers cust on sal.cust_id=cust.cust_id)
+where prod_category='Women' or prod_category='Girls'
+group by prod_category)
+select cust_first_name,cust_last_name,prod_list_price,cust_year_of_birth,prod_category from products prod inner join sales sal on prod.prod_id=sal.prod_id inner join customers cust on sal.cust_id=cust.cust_id 
+where (cust_year_of_birth>1980) and((prod_category='Women' and prod_list_price in (select min_price from ad where prod_category='Women')) or (prod_list_price in (select min_price from ad where prod_category='Girls') and prod_category='Girls'))
+5)Написать запрос, выводящий Среднюю сумму покупки (является произведением цены товара на количество проданного товара (quantity_sold)) в каждой стране, полное название страны. Отсортировать в порядке убывания средней суммы.
+select country_name,cast(AVG(prod_list_price*quantity_sold) as decimal(10,2)) as average_price from products pr join sales sal on pr.prod_id=sal.prod_id join customers cus on cus.cust_id=sal.cust_id join countries cou on cou.country_id=cus.country_id
+group by country_name
+order by average_price DESC
+7)Написать запрос, выводящий распределение общего количества покупок категории "Мужчины" (Peripherals and Accessories) по странам (т.е. распределение по странам, в которых проживают клиенты), в конечной выборке оставить те страны, в которых общее количество покупок выше, чем средняя сумма покупок в стране (по всему миру) [самостоятельно выбрать категорию, которая есть в таблице]. Упорядочить по полному названию стран.
+with ad as
+(select country_name as country,cast(AVG(prod_list_price*quantity_sold) as decimal(10,2)) as average_price from products pr join sales sal on pr.prod_id=sal.prod_id join customers cus on cus.cust_id=sal.cust_id join countries cou on cou.country_id=cus.country_id
+group by country_name
+order by average_price DESC)
+select country_name,distribution from(select country_name,count(*)as distribution from products pr join sales sal on pr.prod_id=sal.prod_id join customers cus on cus.cust_id=sal.cust_id join countries cou on cou.country_id=cus.country_id
+where prod_category='Men'
+group by country_name
+order by country_name) t join ad on t.country_name=ad.country where distribution > average_price
+order by country_name
+9)Написать запрос, выводящий Максимальное суммарное количество проданных единиц товара за день для каждого продукта. Запрос должен выводить TOP 20 строк, отсортированных по убыванию количества покупок (Столбцы должны быть такими: "Макс покуп/день", prod_name) [Под первым столбцом подразумевается объединение в одно поле количества покупок и последней даты, за которую сделаны эти покупки].
+ - with ad as
+(select prod_name,time_id,sum(quantity_sold)as summ from products pr join sales sal on pr.prod_id=sal.prod_id
+group by prod_name,time_id
+order by prod_name,time_id)
+select * from (select maximum,time_id,prod_name from ad join (select prod_name as prod,max(summ)as maximum from ad group by prod_name) t on ad.prod_name=t.prod
+where maximum=summ)
+# здесь не доделал, скрипт нерабочий
+11)Создать таблицу с именем sales_[имя пользователя в ОС]_[Ваше имя]_[Ваша фамилия], содержающую строки из таблицы sh.sales за пиковый месяц. (Т.е. месяц, за который получена максимальная выручка). Показать все поля таблицы в порядке возрастания дат.
+CREATE TABLE sales_User_Egor_Menyaylo as (select * from sh.sales where EXTRACT(MONTH FROM time_id)= (select month from(select month,sum(amount_sold)su from (select  EXTRACT(MONTH FROM time_id)as month,amount_sold from sh.sales
+group by time_id,amount_sold
+order by month)
+group by month) where su=(select max(su) from (select month,sum(amount_sold)su from (select  EXTRACT(MONTH FROM time_id)as month,amount_sold from sh.sales
+group by time_id,amount_sold
+order by month)
+group by month))) and rownum<=10000);
+select * from sales_User_Egor_Menyaylo
+order by time_id # выдает ошибку: ORA-01652: unable to extend temp segment by 128 in tablespace SYSTEM
+01652. 00000 -  "unable to extend temp segment by %s in tablespace %s"
+*Cause:    Failed to allocate an extent of the required number of blocks for
+           a temporary segment in the tablespace indicated.
+*Action:   Use ALTER TABLESPACE ADD DATAFILE statement to add one or more
+           files to the tablespace indicated. 
+Менять размер файла не могу, потому что нет прав пишет: ORA-01031: insufficient privileges, поэтому ограничил запись в таблицу числом 10000
+
+12)Для созданной в п.11 таблицы изменить значение поля time_id на формат 'DD.MM.YYYY HH24:MI:SS' (см. NLS_DATE_FORMAT). Значение hh24:mm:ss должно выбираться случайным образом. Сохранить сделанные изменения. Показать все поля таблицы в порядке возрастания дат. time_id=time_id+dbms_random.value;
+alter session set nls_date_format = 'dd.mm.yyyy hh24:mi:ss';
+with time as
+      (select date '2019-01-01' min,
+              date '2019-01-31' max
+       from dual
+      )
+insert into sales_User_Egor_Menyaylo (new_time_id)
+ select min + dbms_random.value(0, level) new_time
+    from time
+    connect by level <= max - min
+# здесь тоже пока не до конца, но что-то подобное должно быть
+
+Всего решил 8 задач.
+
+в 6 не понял о каких доменах речь, так как они вроде бы у всех customers одинаковые @company.com
+12,13,14 не успел
+
+
+
+
+
+
+
+
